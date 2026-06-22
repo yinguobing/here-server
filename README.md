@@ -89,12 +89,63 @@
 }
 ```
 
-## 运行
+## 部署
+
+### 方式一：deb 包安装（推荐）
+
+从 [Releases](https://github.com/yinguobing/i-am-here/releases) 下载 deb 包：
 
 ```bash
-export LOCATION_TOKEN="your-secret-token"
-export PORT=9001
-python3 location_receiver.py
+sudo dpkg -i i-am-here_0.1.0-1_amd64.deb
 ```
 
-生产环境建议在 Nginx 反向代理之后运行。
+安装后自动创建 `/etc/i-am-here/env` 并启动服务。**立即修改 Token：**
+
+```bash
+sudo vim /etc/i-am-here/env
+# 修改 LOCATION_TOKEN 为你的密钥
+sudo systemctl restart i-am-here
+```
+
+### 服务管理
+
+```bash
+systemctl status i-am-here   # 查看状态
+systemctl restart i-am-here  # 重启（修改配置后）
+journalctl -u i-am-here -f   # 查看日志
+```
+
+### 方式二：从源码编译
+
+```bash
+# 1. 编译
+cargo build --release
+
+# 2. 启动
+export LOCATION_TOKEN="your-secret-token"
+export PORT=9001
+./target/release/i-am-here
+```
+
+### 打包 deb
+
+```bash
+cargo install cargo-deb
+cargo deb
+# 输出：target/debian/i-am-here_*.deb
+```
+
+## Nginx 反向代理（可选）
+
+生产环境建议前置 Nginx：
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:9001;
+    }
+}
+```
