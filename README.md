@@ -15,7 +15,10 @@
 | Header | 说明 |
 |---|---|
 | `Content-Type` | `application/json`（必填） |
-| `X-Location-Token` | 鉴权 Token，由服务端环境变量 `LOCATION_TOKEN` 配置 |
+| `Authorization` | `Bearer <token>`，推荐使用 |
+| `X-Location-Token` | 兼容旧版，直接传 Token 值 |
+
+> 两个 Header 二选一即可。`Authorization` 优先。
 
 **Body（JSON）**
 
@@ -60,6 +63,40 @@
 
 > `count` 为当前存储的定位记录总数。
 
+### GET /location
+
+查询定位记录，供下游智能体读取。需鉴权。
+
+**Query 参数**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `limit` | number | `50` | 返回最近 N 条记录 |
+
+请求示例：
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://localhost:9001/location?limit=10"
+```
+
+响应：按时间升序的最近 N 条记录：
+
+```json
+[
+  {
+    "lat": 23.19,
+    "lon": 113.47,
+    "timestamp": 1782140344,
+    "source": "harmonyos",
+    "accuracy": 10.5,
+    "altitude": 42.0,
+    "speed": 0.0,
+    "received_at": "2026-06-22T14:59:04.121+00:00"
+  }
+]
+```
+
 ### GET /health
 
 健康检查，返回 `ok`。
@@ -83,6 +120,9 @@
       "lon": 113.470556,
       "timestamp": 1776854363,
       "source": "harmonyos",
+      "accuracy": 10.5,
+      "altitude": 42.0,
+      "speed": 0.0,
       "received_at": "2026-06-22T14:30:00.123456+00:00"
     }
   ]

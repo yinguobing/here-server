@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Json},
-    routing::{get, post},
+    routing::get,
     Router,
 };
 use chrono::{TimeDelta, Utc};
@@ -28,7 +28,6 @@ struct AppState {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct LocationInput {
     lat: f64,
     lon: f64,
@@ -42,18 +41,34 @@ struct LocationInput {
     speed: Option<f64>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct LocationRecord {
     lat: f64,
     lon: f64,
     timestamp: i64,
     source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    accuracy: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    altitude: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    speed: Option<f64>,
     received_at: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct LocationData {
     locations: Vec<LocationRecord>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LocationQuery {
+    #[serde(default = "default_limit")]
+    limit: usize,
+}
+
+fn default_limit() -> usize {
+    50
 }
 
 #[derive(Debug, Serialize)]
@@ -111,6 +126,23 @@ fn prune_old(data: &mut LocationData, max_hours: i64) {
 }
 
 // ---------------------------------------------------------------------------
+// Auth helper
+// ---------------------------------------------------------------------------
+
+fn extract_token(headers: &HeaderMap) -> Option<&str> {
+    // Prefer standard Authorization: Bearer header
+    if let Some(auth) = headers.get("Authorization").and_then(|v| v.to_str().ok()) {
+        if let Some(token) = auth.strip_prefix("Bearer ") {
+            return Some(token);
+        }
+    }
+    // Fall back to legacy X-Location-Token
+    headers
+        .get("X-Location-Token")
+        .and_then(|v| v.to_str().ok())
+}
+
+// ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
 
@@ -120,10 +152,7 @@ async fn post_location(
     Json(payload): Json<LocationInput>,
 ) -> Result<Json<PostResponse>, AppError> {
     // Token check
-    let token = headers
-        .get("X-Location-Token")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
+    let token = extract_token(&headers).unwrap_or("");
     if token != state.token {
         return Err(AppError::Unauthorized);
     }
@@ -142,6 +171,9 @@ async fn post_location(
         lon: payload.lon,
         timestamp: payload.timestamp,
         source: payload.source,
+        accuracy: payload.accuracy,
+        altitude: payload.altitude,
+        speed: payload.speed,
         received_at: Utc::now().to_rfc3339(),
     });
 
@@ -156,6 +188,23 @@ async fn post_location(
         ok: true,
         count: data.locations.len(),
     }))
+}
+
+async fn get_locations(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<LocationQuery>,
+) -> Result<Json<Vec<LocationRecord>>, AppError> {
+    let token = extract_token(&headers).unwrap_or("");
+    if token != state.token {
+        return Err(AppError::Unauthorized);
+    }
+
+    let data = load_data(&state.data_file);
+    let start = data.locations.len().saturating_sub(q.limit);
+    let recent: Vec<LocationRecord> = data.locations[start..].to_vec();
+
+    Ok(Json(recent))
 }
 
 async fn health() -> &'static str {
@@ -190,7 +239,10 @@ async fn main() {
     });
 
     let app = Router::new()
-        .route("/location", post(post_location))
+        .route(
+            "/location",
+            get(get_locations).post(post_location),
+        )
         .route("/health", get(health))
         .with_state(state);
 
