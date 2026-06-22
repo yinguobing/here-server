@@ -2,6 +2,8 @@
 name = "i-am-here"
 version = "0.1.0"
 edition = "2021"
+description = "鸿蒙 App「我在这里」的定位数据接收后端"
+license = "MIT"
 
 [dependencies]
 axum = "0.7"
@@ -11,3 +13,17 @@ serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono = { version = "0.4", features = ["serde"] }
+
+[package.metadata.deb]
+maintainer = "yinguobing"
+extended-description = """\
+鸿蒙 App「我在这里」的定位数据接收后端。
+接收设备上报的 GPS 定位数据，支持 systemd 开机自启。"""
+depends = ""
+section = "net"
+priority = "optional"
+assets = [
+    ["target/release/i-am-here", "usr/bin/i-am-here", "755"],
+    ["debian/i-am-here.service", "lib/systemd/system/i-am-here.service", "644"],
+]
+maintainer-scripts = "debian/"

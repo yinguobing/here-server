@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    # Create default env file if it doesn't exist
+    if [ ! -f /etc/i-am-here/env ]; then
+        mkdir -p /etc/i-am-here
+        cat > /etc/i-am-here/env <<'EOF'
+# 我在这里 - 环境配置
+# 部署时必须修改 TOKEN
+LOCATION_TOKEN=change-me-to-a-secret-token
+PORT=9001
+MAX_HOURS=24
+EOF
+        chmod 600 /etc/i-am-here/env
+    fi
+
+    systemctl daemon-reload
+    systemctl enable i-am-here || true
+    systemctl start i-am-here || true
+fi

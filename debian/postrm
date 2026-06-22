@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "purge" ]; then
+    rm -f /etc/i-am-here/env
+    rmdir /etc/i-am-here 2>/dev/null || true
+fi

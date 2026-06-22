@@ -1,0 +1,20 @@
+[Unit]
+Description=I Am Here - Location receiver
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/i-am-here
+Restart=always
+RestartSec=5
+EnvironmentFile=-/etc/i-am-here/env
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/tmp
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
