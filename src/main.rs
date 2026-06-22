@@ -121,8 +121,7 @@ fn prune_old(data: &mut LocationData, max_hours: i64) {
         .checked_sub_signed(TimeDelta::hours(max_hours))
         .unwrap_or_else(Utc::now);
     let cutoff_ts = cutoff.timestamp();
-    data.locations
-        .retain(|loc| loc.timestamp > cutoff_ts);
+    data.locations.retain(|loc| loc.timestamp > cutoff_ts);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,8 +219,7 @@ async fn main() {
     // Initialise tracing
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
@@ -239,10 +237,7 @@ async fn main() {
     });
 
     let app = Router::new()
-        .route(
-            "/location",
-            get(get_locations).post(post_location),
-        )
+        .route("/location", get(get_locations).post(post_location))
         .route("/health", get(health))
         .with_state(state);
 
