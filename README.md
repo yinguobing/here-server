@@ -4,6 +4,13 @@
 
 > App 下载与使用说明：[yinguobing.com/tools/footprint-ohos](https://yinguobing.com/tools/footprint-ohos/)
 
+## 两个二进制
+
+| 二进制 | 用途 |
+|---|---|
+| `here-server` | HTTP 服务，常驻后台运行。接收和查询定位数据 |
+| `here` | 管理 CLI，跑完即退。创建用户、轮换 Token 等 |
+
 ## 用户管理
 
 首次使用需创建用户（获得独立 Token）：
