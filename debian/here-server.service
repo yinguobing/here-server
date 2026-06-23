@@ -13,8 +13,6 @@ DynamicUser=no
 User=here-server
 Group=here-server
 NoNewPrivileges=yes
-ProtectSystem=full
-ProtectHome=yes
 PrivateTmp=yes
 
 [Install]
