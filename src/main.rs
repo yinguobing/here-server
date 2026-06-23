@@ -12,10 +12,8 @@ use chrono::{TimeDelta, Utc};
 use serde::Deserialize;
 use tracing::{error, info};
 
+use db::{create_user, find_user_by_token, insert_location, prune_old_locations, LocationInput};
 use i_am_here::db;
-use db::{
-    create_user, find_user_by_token, insert_location, prune_old_locations, LocationInput,
-};
 
 // ---------------------------------------------------------------------------
 // App state
@@ -108,10 +106,7 @@ async fn post_location(
 
     info!(
         "POST /location user={} lat={:.6} lon={:.6} ts={}",
-        user_id,
-        payload.lat,
-        payload.lon,
-        payload.timestamp
+        user_id, payload.lat, payload.lon, payload.timestamp
     );
 
     let received_at = Utc::now().to_rfc3339();
@@ -186,8 +181,7 @@ async fn health() -> &'static str {
 async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 

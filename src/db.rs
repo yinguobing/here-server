@@ -111,7 +111,9 @@ pub async fn create_user(
 ) -> Result<UserInfo, surrealdb::Error> {
     let token = uuid_v4();
     let mut result = db
-        .query("CREATE users CONTENT { name: $name, api_token: $api_tok } RETURN id, name, api_token")
+        .query(
+            "CREATE users CONTENT { name: $name, api_token: $api_tok } RETURN id, name, api_token",
+        )
         .bind(("name", name.to_string()))
         .bind(("api_tok", token.clone()))
         .await?;
@@ -141,8 +143,7 @@ pub async fn delete_user(
 ) -> Result<(), surrealdb::Error> {
     db.query(format!("DELETE FROM locations WHERE user_id = '{id}'"))
         .await?;
-    db.query(format!("DELETE FROM {id}"))
-        .await?;
+    db.query(format!("DELETE FROM {id}")).await?;
     Ok(())
 }
 
@@ -219,9 +220,7 @@ pub async fn get_locations(
     limit: usize,
 ) -> Result<Vec<LocationRecord>, surrealdb::Error> {
     let mut result = db
-        .query(
-            "SELECT * FROM locations WHERE user_id = $uid ORDER BY timestamp DESC LIMIT $limit",
-        )
+        .query("SELECT * FROM locations WHERE user_id = $uid ORDER BY timestamp DESC LIMIT $limit")
         .bind(("uid", user_id.to_string()))
         .bind(("limit", limit as i64))
         .await?;
