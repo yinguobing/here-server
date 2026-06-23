@@ -1,5 +1,5 @@
 [Unit]
-Description=Here Server - Location receiver
+Description=Here Server - Location API
 After=network-online.target
 Wants=network-online.target
 
@@ -8,11 +8,12 @@ Type=simple
 ExecStart=/usr/bin/here-server
 Restart=always
 RestartSec=5
-EnvironmentFile=-/etc/here-server/env
-DynamicUser=yes
-StateDirectory=here-server
+EnvironmentFile=/etc/here-server/env
+DynamicUser=no
+User=here-server
+Group=here-server
 NoNewPrivileges=yes
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=yes
 PrivateTmp=yes
 

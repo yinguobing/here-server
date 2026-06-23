@@ -2,6 +2,7 @@
 set -e
 
 if [ "$1" = "configure" ]; then
+    # Create config
     if [ ! -f /etc/here-server/env ]; then
         mkdir -p /etc/here-server
         cat > /etc/here-server/env <<'EOF'
@@ -12,7 +13,15 @@ MAX_HOURS=24
 EOF
         chmod 600 /etc/here-server/env
     fi
+
+    # Create here-server system user
+    if ! getent passwd here-server > /dev/null 2>&1; then
+        useradd --system --no-create-home --shell /usr/sbin/nologin here-server
+    fi
+
+    # Create and fix data directory
     mkdir -p /var/lib/here-server
+    chown -R here-server:here-server /var/lib/here-server
     chmod 700 /var/lib/here-server
 
     systemctl daemon-reload
