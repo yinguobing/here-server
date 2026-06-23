@@ -12,7 +12,9 @@ use chrono::{TimeDelta, Utc};
 use serde::Deserialize;
 use tracing::{error, info};
 
-use db::{create_user, find_user_by_token, insert_location, prune_old_locations, LocationInput};
+use db::{
+    create_user_with_token, find_user_by_token, insert_location, prune_old_locations, LocationInput,
+};
 use i_am_here::db;
 
 // ---------------------------------------------------------------------------
@@ -202,7 +204,7 @@ async fn main() {
             // Check if this token already exists
             match find_user_by_token(&db, &token).await {
                 Ok(None) => {
-                    if let Err(e) = create_user(&db, "admin").await {
+                    if let Err(e) = create_user_with_token(&db, "admin", &token).await {
                         error!("Failed to auto-create admin user: {e}");
                     } else {
                         info!("Auto-created admin user from LOCATION_TOKEN");
