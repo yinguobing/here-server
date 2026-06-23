@@ -15,7 +15,7 @@ use tracing::{error, info};
 use db::{
     create_user_with_token, find_user_by_token, insert_location, prune_old_locations, LocationInput,
 };
-use i_am_here::db;
+use here_server::db;
 
 // ---------------------------------------------------------------------------
 // App state
@@ -187,7 +187,7 @@ async fn main() {
         )
         .init();
 
-    let db_path = env::var("DATA_DIR").unwrap_or_else(|_| "/var/lib/i-am-here".into());
+    let db_path = env::var("DATA_DIR").unwrap_or_else(|_| "/var/lib/here-server".into());
     let max_hours: i64 = env::var("MAX_HOURS")
         .ok()
         .and_then(|v| v.parse().ok())

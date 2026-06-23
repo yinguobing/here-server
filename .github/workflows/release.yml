@@ -63,22 +63,22 @@ jobs:
         if: matrix.archive == 'tar.gz'
         run: |
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/i-am-here dist/i-am-here
+          cp target/${{ matrix.target }}/release/here-server dist/here-server
           cp README.md dist/
           cd dist
-          tar czf i-am-here-${{ github.ref_name }}-${{ matrix.target }}.tar.gz i-am-here README.md
-          echo "ASSET=i-am-here-${{ github.ref_name }}-${{ matrix.target }}.tar.gz" >> $GITHUB_ENV
+          tar czf here-server-${{ github.ref_name }}-${{ matrix.target }}.tar.gz here-server README.md
+          echo "ASSET=here-server-${{ github.ref_name }}-${{ matrix.target }}.tar.gz" >> $GITHUB_ENV
 
       - name: Package (Windows)
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist
-          Copy-Item target/${{ matrix.target }}/release/i-am-here.exe dist/i-am-here.exe
+          Copy-Item target/${{ matrix.target }}/release/here-server.exe dist/here-server.exe
           Copy-Item README.md dist/
           cd dist
-          Compress-Archive -Path i-am-here.exe,README.md -DestinationPath i-am-here-${{ github.ref_name }}-${{ matrix.target }}.zip
-          echo "ASSET=i-am-here-${{ github.ref_name }}-${{ matrix.target }}.zip" >> $env:GITHUB_ENV
+          Compress-Archive -Path here-server.exe,README.md -DestinationPath here-server-${{ github.ref_name }}-${{ matrix.target }}.zip
+          echo "ASSET=here-server-${{ github.ref_name }}-${{ matrix.target }}.zip" >> $env:GITHUB_ENV
 
       - name: Calculate checksum (Unix)
         if: matrix.archive == 'tar.gz'
@@ -96,7 +96,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: i-am-here-${{ matrix.target }}
+          name: here-server-${{ matrix.target }}
           path: dist/*
 
   deb:
@@ -121,8 +121,8 @@ jobs:
       - name: Upload deb artifact
         uses: actions/upload-artifact@v5
         with:
-          name: i-am-here-deb
-          path: target/debian/i-am-here_*.deb
+          name: here-server-deb
+          path: target/debian/here-server_*.deb
 
   release:
     name: Create Release
@@ -137,7 +137,7 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           path: artifacts
-          pattern: i-am-here-*
+          pattern: here-server-*
           merge-multiple: true
 
       - name: List artifacts

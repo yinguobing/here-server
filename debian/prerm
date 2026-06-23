@@ -2,6 +2,6 @@
 set -e
 
 if [ "$1" = "remove" ]; then
-    systemctl stop i-am-here || true
-    systemctl disable i-am-here || true
+    systemctl stop here-server || true
+    systemctl disable here-server || true
 fi

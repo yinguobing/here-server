@@ -85,5 +85,5 @@ jobs:
       - name: Upload deb artifact
         uses: actions/upload-artifact@v5
         with:
-          name: i-am-here-deb
-          path: target/debian/i-am-here_*.deb
+          name: here-server-deb
+          path: target/debian/here-server_*.deb

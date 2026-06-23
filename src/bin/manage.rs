@@ -1,6 +1,6 @@
 use std::env;
 
-use i_am_here::db;
+use here_server::db;
 
 #[tokio::main]
 async fn main() {
@@ -10,7 +10,7 @@ async fn main() {
         return;
     }
 
-    let db_path = env::var("DATA_DIR").unwrap_or_else(|_| "/var/lib/i-am-here".into());
+    let db_path = env::var("DATA_DIR").unwrap_or_else(|_| "/var/lib/here-server".into());
     let db = db::init(&db_path).await.unwrap_or_else(|e| {
         eprintln!("Failed to open database at {db_path}: {e}");
         std::process::exit(1);
@@ -75,5 +75,5 @@ fn usage(prog: &str) {
     eprintln!("  {prog} delete-user <id>        Delete a user and their data");
     eprintln!("  {prog} rotate-token <id>       Generate a new token for a user");
     eprintln!();
-    eprintln!("  Database path: DATA_DIR env var (default: /var/lib/i-am-here)");
+    eprintln!("  Database path: DATA_DIR env var (default: /var/lib/here-server)");
 }

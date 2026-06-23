@@ -2,21 +2,20 @@
 set -e
 
 if [ "$1" = "configure" ]; then
-    # Create default env file if it doesn't exist
-    if [ ! -f /etc/i-am-here/env ]; then
-        mkdir -p /etc/i-am-here
-        cat > /etc/i-am-here/env <<'EOF'
-# 我在这里 - 环境配置
+    if [ ! -f /etc/here-server/env ]; then
+        mkdir -p /etc/here-server
+        cat > /etc/here-server/env <<'EOF'
+# Here Server - 环境配置
 PORT=9001
-DATA_DIR=/var/lib/i-am-here
+DATA_DIR=/var/lib/here-server
 MAX_HOURS=24
 EOF
-        mkdir -p /var/lib/i-am-here
-        chmod 700 /var/lib/i-am-here
-        chmod 600 /etc/i-am-here/env
+        chmod 600 /etc/here-server/env
     fi
+    mkdir -p /var/lib/here-server
+    chmod 700 /var/lib/here-server
 
     systemctl daemon-reload
-    systemctl enable i-am-here || true
-    systemctl start i-am-here || true
+    systemctl enable here-server || true
+    systemctl start here-server || true
 fi

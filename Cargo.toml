@@ -1,5 +1,5 @@
 [package]
-name = "i-am-here"
+name = "here-server"
 version = "0.1.0"
 edition = "2021"
 description = "鸿蒙 App「我在这里」的定位数据接收后端"
@@ -24,7 +24,7 @@ depends = ""
 section = "net"
 priority = "optional"
 assets = [
-    ["target/release/i-am-here", "usr/bin/i-am-here", "755"],
-    ["debian/i-am-here.service", "lib/systemd/system/i-am-here.service", "644"],
+    ["target/release/here-server", "usr/bin/here-server", "755"],
+    ["debian/here-server.service", "lib/systemd/system/here-server.service", "644"],
 ]
 maintainer-scripts = "debian/"

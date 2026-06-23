@@ -125,25 +125,25 @@ curl -H "Authorization: Bearer <token>" \
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
 | `PORT` | `9001` | 监听端口 |
-| `DATA_DIR` | `/var/lib/i-am-here` | 数据库持久化目录 |
+| `DATA_DIR` | `/var/lib/here-server` | 数据库持久化目录 |
 | `MAX_HOURS` | `24` | 定位记录保留时长 |
 | `LOCATION_TOKEN` | — | 向后兼容：设置后自动创建 admin 用户 |
 
 ## 数据存储
 
-SurrealDB 嵌入式数据库，通过 `DATA_DIR` 指定持久化目录（默认 `/var/lib/i-am-here`）。自动清理超过 `MAX_HOURS`（默认 24 小时）的旧记录。
+SurrealDB 嵌入式数据库，通过 `DATA_DIR` 指定持久化目录（默认 `/var/lib/here-server`）。自动清理超过 `MAX_HOURS`（默认 24 小时）的旧记录。
 
 ## 部署
 
 ### 方式一：deb 包安装（推荐）
 
-从 [Releases](https://github.com/yinguobing/i-am-here/releases) 下载 deb 包：
+从 [Releases](https://github.com/yinguobing/here-server/releases) 下载 deb 包：
 
 ```bash
-sudo dpkg -i i-am-here_0.1.0-1_amd64.deb
+sudo dpkg -i here-server_0.1.0-1_amd64.deb
 ```
 
-安装后自动创建 `/etc/i-am-here/env` 并启动服务。**启动后创建用户：**
+安装后自动创建 `/etc/here-server/env` 并启动服务。**启动后创建用户：**
 
 ```bash
 # 获得用户 Token
@@ -155,9 +155,9 @@ manage add-user "你的名字"
 ### 服务管理
 
 ```bash
-systemctl status i-am-here   # 查看状态
-systemctl restart i-am-here  # 重启（修改配置后）
-journalctl -u i-am-here -f   # 查看日志
+systemctl status here-server   # 查看状态
+systemctl restart here-server  # 重启（修改配置后）
+journalctl -u here-server -f   # 查看日志
 manage list-users            # 查看所有用户
 manage add-user "name"       # 新增用户
 ```
@@ -165,13 +165,13 @@ manage add-user "name"       # 新增用户
 ### 方式二：从源码编译
 
 ```bash
-# 1. 编译（输出两个二进制：i-am-here、manage）
+# 1. 编译（输出两个二进制：here-server、manage）
 cargo build --release
 
 # 2. 启动服务
-export DATA_DIR=/var/lib/i-am-here
+export DATA_DIR=/var/lib/here-server
 export PORT=9001
-./target/release/i-am-here &
+./target/release/here-server &
 
 # 3. 创建用户
 ./target/release/manage add-user "你的名字"
@@ -182,7 +182,7 @@ export PORT=9001
 ```bash
 cargo install cargo-deb
 cargo deb
-# 输出：target/debian/i-am-here_*.deb
+# 输出：target/debian/here-server_*.deb
 ```
 
 ## Nginx 反向代理（可选）

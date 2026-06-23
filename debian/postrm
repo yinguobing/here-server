@@ -2,6 +2,6 @@
 set -e
 
 if [ "$1" = "purge" ]; then
-    rm -f /etc/i-am-here/env
-    rmdir /etc/i-am-here 2>/dev/null || true
+    rm -f /etc/here-server/env
+    rmdir /etc/here-server 2>/dev/null || true
 fi

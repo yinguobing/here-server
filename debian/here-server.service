@@ -1,16 +1,16 @@
 [Unit]
-Description=I Am Here - Location receiver
+Description=Here Server - Location receiver
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/i-am-here
+ExecStart=/usr/bin/here-server
 Restart=always
 RestartSec=5
-EnvironmentFile=-/etc/i-am-here/env
+EnvironmentFile=-/etc/here-server/env
 DynamicUser=yes
-StateDirectory=i-am-here
+StateDirectory=here-server
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
