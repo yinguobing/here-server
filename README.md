@@ -10,17 +10,17 @@
 
 ```bash
 # 创建用户
-./manage add-user "你的名字"
+./here add-user "你的名字"
 # → 输出 ID、Name、Token
 
 # 查看所有用户
-./manage list-users
+./here list-users
 
 # 轮换 Token
-./manage rotate-token <用户ID>
+./here rotate-token <用户ID>
 
 # 删除用户（含其所有数据）
-./manage delete-user <用户ID>
+./here delete-user <用户ID>
 ```
 
 ## API
@@ -147,7 +147,7 @@ sudo dpkg -i here-server_0.1.0-1_amd64.deb
 
 ```bash
 # 获得用户 Token
-manage add-user "你的名字"
+here add-user "你的名字"
 
 # 将输出的 Token 填入 App 设置页
 ```
@@ -158,14 +158,14 @@ manage add-user "你的名字"
 systemctl status here-server   # 查看状态
 systemctl restart here-server  # 重启（修改配置后）
 journalctl -u here-server -f   # 查看日志
-manage list-users            # 查看所有用户
-manage add-user "name"       # 新增用户
+here list-users            # 查看所有用户
+here add-user "name"       # 新增用户
 ```
 
 ### 方式二：从源码编译
 
 ```bash
-# 1. 编译（输出两个二进制：here-server、manage）
+# 1. 编译（输出两个二进制：here-server、here）
 cargo build --release
 
 # 2. 启动服务
@@ -174,7 +174,7 @@ export PORT=9001
 ./target/release/here-server &
 
 # 3. 创建用户
-./target/release/manage add-user "你的名字"
+./target/release/here add-user "你的名字"
 ```
 
 ### 打包 deb
