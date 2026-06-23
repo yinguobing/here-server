@@ -143,12 +143,13 @@ SurrealDB 嵌入式数据库，通过 `DATA_DIR` 指定持久化目录（默认 
 sudo dpkg -i i-am-here_0.1.0-1_amd64.deb
 ```
 
-安装后自动创建 `/etc/i-am-here/env` 并启动服务。**立即修改 Token：**
+安装后自动创建 `/etc/i-am-here/env` 并启动服务。**启动后创建用户：**
 
 ```bash
-sudo vim /etc/i-am-here/env
-# 修改 LOCATION_TOKEN 为你的密钥
-sudo systemctl restart i-am-here
+# 获得用户 Token
+manage add-user "你的名字"
+
+# 将输出的 Token 填入 App 设置页
 ```
 
 ### 服务管理
@@ -157,18 +158,23 @@ sudo systemctl restart i-am-here
 systemctl status i-am-here   # 查看状态
 systemctl restart i-am-here  # 重启（修改配置后）
 journalctl -u i-am-here -f   # 查看日志
+manage list-users            # 查看所有用户
+manage add-user "name"       # 新增用户
 ```
 
 ### 方式二：从源码编译
 
 ```bash
-# 1. 编译
+# 1. 编译（输出两个二进制：i-am-here、manage）
 cargo build --release
 
-# 2. 启动
-export LOCATION_TOKEN="your-secret-token"
+# 2. 启动服务
+export DATA_DIR=/var/lib/i-am-here
 export PORT=9001
-./target/release/i-am-here
+./target/release/i-am-here &
+
+# 3. 创建用户
+./target/release/manage add-user "你的名字"
 ```
 
 ### 打包 deb
