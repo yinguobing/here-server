@@ -10,10 +10,10 @@ Restart=always
 RestartSec=5
 EnvironmentFile=-/etc/i-am-here/env
 DynamicUser=yes
+StateDirectory=i-am-here
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/tmp
 PrivateTmp=yes
 
 [Install]

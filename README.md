@@ -1,8 +1,27 @@
 # 我在这里 (I Am Here)
 
-鸿蒙 App「我在这里」的定位数据接收后端。接收设备上报的 GPS 定位数据，存入本地 JSON 文件，供下游智能体或服务读取。
+鸿蒙 App「我在这里」的后端服务。接收设备上报的 GPS 定位数据，基于 SurrealDB 存储，支持多用户独立 Token 和数据隔离。
 
 > App 下载与使用说明：[yinguobing.com/tools/footprint-ohos](https://yinguobing.com/tools/footprint-ohos/)
+
+## 用户管理
+
+首次使用需创建用户（获得独立 Token）：
+
+```bash
+# 创建用户
+./manage add-user "你的名字"
+# → 输出 ID、Name、Token
+
+# 查看所有用户
+./manage list-users
+
+# 轮换 Token
+./manage rotate-token <用户ID>
+
+# 删除用户（含其所有数据）
+./manage delete-user <用户ID>
+```
 
 ## API
 
@@ -106,28 +125,13 @@ curl -H "Authorization: Bearer <token>" \
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
 | `PORT` | `9001` | 监听端口 |
-| `LOCATION_TOKEN` | `change-me-to-a-secret-token` | API 鉴权 Token，**部署时务必修改** |
+| `DATA_DIR` | `/var/lib/i-am-here` | 数据库持久化目录 |
+| `MAX_HOURS` | `24` | 定位记录保留时长 |
+| `LOCATION_TOKEN` | — | 向后兼容：设置后自动创建 admin 用户 |
 
 ## 数据存储
 
-定位数据保存在 `/tmp/location.json`，自动清理 24 小时前的记录，结构如下：
-
-```json
-{
-  "locations": [
-    {
-      "lat": 23.190664,
-      "lon": 113.470556,
-      "timestamp": 1776854363,
-      "source": "harmonyos",
-      "accuracy": 10.5,
-      "altitude": 42.0,
-      "speed": 0.0,
-      "received_at": "2026-06-22T14:30:00.123456+00:00"
-    }
-  ]
-}
-```
+SurrealDB 嵌入式数据库，通过 `DATA_DIR` 指定持久化目录（默认 `/var/lib/i-am-here`）。自动清理超过 `MAX_HOURS`（默认 24 小时）的旧记录。
 
 ## 部署
 

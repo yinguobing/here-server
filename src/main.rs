@@ -1,5 +1,4 @@
 use std::env;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::{
@@ -10,56 +9,26 @@ use axum::{
     Router,
 };
 use chrono::{TimeDelta, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tracing::{error, info};
 
+use i_am_here::db;
+use db::{
+    create_user, find_user_by_token, insert_location, prune_old_locations, LocationInput,
+};
+
 // ---------------------------------------------------------------------------
-// State
+// App state
 // ---------------------------------------------------------------------------
 
 struct AppState {
-    token: String,
-    data_file: PathBuf,
+    db: surrealdb::Surreal<surrealdb::engine::local::Db>,
     max_hours: i64,
 }
 
 // ---------------------------------------------------------------------------
 // Data types
 // ---------------------------------------------------------------------------
-
-#[derive(Debug, Deserialize)]
-struct LocationInput {
-    lat: f64,
-    lon: f64,
-    timestamp: i64,
-    source: String,
-    #[serde(default)]
-    accuracy: Option<f64>,
-    #[serde(default)]
-    altitude: Option<f64>,
-    #[serde(default)]
-    speed: Option<f64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct LocationRecord {
-    lat: f64,
-    lon: f64,
-    timestamp: i64,
-    source: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    accuracy: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    altitude: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    speed: Option<f64>,
-    received_at: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct LocationData {
-    locations: Vec<LocationRecord>,
-}
 
 #[derive(Debug, Deserialize)]
 struct LocationQuery {
@@ -71,7 +40,7 @@ fn default_limit() -> usize {
     50
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct PostResponse {
     ok: bool,
     count: usize,
@@ -83,45 +52,20 @@ struct PostResponse {
 
 enum AppError {
     Unauthorized,
+    Internal(String),
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
         match self {
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized"),
+            AppError::Internal(msg) => {
+                error!("{msg}");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
         }
         .into_response()
     }
-}
-
-// ---------------------------------------------------------------------------
-// Data layer
-// ---------------------------------------------------------------------------
-
-fn load_data(path: &std::path::Path) -> LocationData {
-    match std::fs::read_to_string(path) {
-        Ok(content) => serde_json::from_str(&content).unwrap_or(LocationData {
-            locations: Vec::new(),
-        }),
-        Err(_) => LocationData {
-            locations: Vec::new(),
-        },
-    }
-}
-
-fn save_data(path: &std::path::Path, data: &LocationData) -> Result<(), String> {
-    let json =
-        serde_json::to_string_pretty(data).map_err(|e| format!("Failed to serialize: {e}"))?;
-    std::fs::write(path, json).map_err(|e| format!("Failed to write file: {e}"))?;
-    Ok(())
-}
-
-fn prune_old(data: &mut LocationData, max_hours: i64) {
-    let cutoff = Utc::now()
-        .checked_sub_signed(TimeDelta::hours(max_hours))
-        .unwrap_or_else(Utc::now);
-    let cutoff_ts = cutoff.timestamp();
-    data.locations.retain(|loc| loc.timestamp > cutoff_ts);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,13 +73,11 @@ fn prune_old(data: &mut LocationData, max_hours: i64) {
 // ---------------------------------------------------------------------------
 
 fn extract_token(headers: &HeaderMap) -> Option<&str> {
-    // Prefer standard Authorization: Bearer header
     if let Some(auth) = headers.get("Authorization").and_then(|v| v.to_str().ok()) {
         if let Some(token) = auth.strip_prefix("Bearer ") {
             return Some(token);
         }
     }
-    // Fall back to legacy X-Location-Token
     headers
         .get("X-Location-Token")
         .and_then(|v| v.to_str().ok())
@@ -150,60 +92,86 @@ async fn post_location(
     headers: HeaderMap,
     Json(payload): Json<LocationInput>,
 ) -> Result<Json<PostResponse>, AppError> {
-    // Token check
     let token = extract_token(&headers).unwrap_or("");
-    if token != state.token {
-        return Err(AppError::Unauthorized);
-    }
+    let user = find_user_by_token(&state.db, token)
+        .await
+        .map_err(|e| {
+            error!("DB error: {e}");
+            AppError::Internal(e.to_string())
+        })?
+        .ok_or(AppError::Unauthorized)?;
+
+    let user_id = user
+        .id
+        .map(|t| t.to_raw())
+        .unwrap_or_else(|| "users:unknown".into());
 
     info!(
-        "POST /location lat={:.6} lon={:.6} ts={}",
-        payload.lat, payload.lon, payload.timestamp
+        "POST /location user={} lat={:.6} lon={:.6} ts={}",
+        user_id,
+        payload.lat,
+        payload.lon,
+        payload.timestamp
     );
 
-    // Load existing data
-    let mut data = load_data(&state.data_file);
+    let received_at = Utc::now().to_rfc3339();
+    insert_location(&state.db, &user_id, &payload, &received_at)
+        .await
+        .map_err(|e| {
+            error!("Failed to insert location: {e}");
+            AppError::Internal(e.to_string())
+        })?;
 
-    // Append new record
-    data.locations.push(LocationRecord {
-        lat: payload.lat,
-        lon: payload.lon,
-        timestamp: payload.timestamp,
-        source: payload.source,
-        accuracy: payload.accuracy,
-        altitude: payload.altitude,
-        speed: payload.speed,
-        received_at: Utc::now().to_rfc3339(),
-    });
+    // Prune old records for this user
+    let cutoff = Utc::now()
+        .checked_sub_signed(TimeDelta::hours(state.max_hours))
+        .unwrap_or_else(Utc::now)
+        .timestamp();
+    prune_old_locations(&state.db, &user_id, cutoff)
+        .await
+        .map_err(|e| {
+            error!("Failed to prune: {e}");
+        })
+        .ok();
 
-    // Prune and save
-    prune_old(&mut data, state.max_hours);
-    if let Err(e) = save_data(&state.data_file, &data) {
-        error!("Failed to save data: {e}");
-        // Still return success — the record is in memory even if I/O failed
-    }
+    // Count remaining records for this user
+    let count = db::count_locations(&state.db, &user_id)
+        .await
+        .map_err(|e| {
+            error!("Failed to count: {e}");
+            AppError::Internal(e.to_string())
+        })?;
 
-    Ok(Json(PostResponse {
-        ok: true,
-        count: data.locations.len(),
-    }))
+    Ok(Json(PostResponse { ok: true, count }))
 }
 
 async fn get_locations(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(q): Query<LocationQuery>,
-) -> Result<Json<Vec<LocationRecord>>, AppError> {
+) -> Result<Json<Vec<db::LocationRecord>>, AppError> {
     let token = extract_token(&headers).unwrap_or("");
-    if token != state.token {
-        return Err(AppError::Unauthorized);
-    }
+    let user = find_user_by_token(&state.db, token)
+        .await
+        .map_err(|e| {
+            error!("DB error: {e}");
+            AppError::Internal(e.to_string())
+        })?
+        .ok_or(AppError::Unauthorized)?;
 
-    let data = load_data(&state.data_file);
-    let start = data.locations.len().saturating_sub(q.limit);
-    let recent: Vec<LocationRecord> = data.locations[start..].to_vec();
+    let user_id = user
+        .id
+        .map(|t| t.to_raw())
+        .unwrap_or_else(|| "users:unknown".into());
 
-    Ok(Json(recent))
+    let records = db::get_locations(&state.db, &user_id, q.limit)
+        .await
+        .map_err(|e| {
+            error!("Failed to query locations: {e}");
+            AppError::Internal(e.to_string())
+        })?;
+
+    Ok(Json(records))
 }
 
 async fn health() -> &'static str {
@@ -216,25 +184,43 @@ async fn health() -> &'static str {
 
 #[tokio::main]
 async fn main() {
-    // Initialise tracing
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "info".into()),
         )
         .init();
 
-    let token = env::var("LOCATION_TOKEN").unwrap_or_else(|_| "change-me-to-a-secret-token".into());
-    let data_file = PathBuf::from("/tmp/location.json");
+    let db_path = env::var("DATA_DIR").unwrap_or_else(|_| "/var/lib/i-am-here".into());
     let max_hours: i64 = env::var("MAX_HOURS")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(24);
 
-    let state = Arc::new(AppState {
-        token,
-        data_file,
-        max_hours,
+    let db = db::init(&db_path).await.unwrap_or_else(|e| {
+        eprintln!("Failed to initialize database at {db_path}: {e}");
+        std::process::exit(1);
     });
+
+    // Auto-create admin user from legacy LOCATION_TOKEN if set
+    if let Ok(token) = env::var("LOCATION_TOKEN") {
+        if token != "change-me-to-a-secret-token" {
+            // Check if this token already exists
+            match find_user_by_token(&db, &token).await {
+                Ok(None) => {
+                    if let Err(e) = create_user(&db, "admin").await {
+                        error!("Failed to auto-create admin user: {e}");
+                    } else {
+                        info!("Auto-created admin user from LOCATION_TOKEN");
+                    }
+                }
+                Err(e) => error!("Failed to check for existing admin: {e}"),
+                _ => {} // token already exists
+            }
+        }
+    }
+
+    let state = Arc::new(AppState { db, max_hours });
 
     let app = Router::new()
         .route("/location", get(get_locations).post(post_location))

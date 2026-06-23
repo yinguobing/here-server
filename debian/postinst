@@ -7,11 +7,12 @@ if [ "$1" = "configure" ]; then
         mkdir -p /etc/i-am-here
         cat > /etc/i-am-here/env <<'EOF'
 # 我在这里 - 环境配置
-# 部署时必须修改 TOKEN
-LOCATION_TOKEN=change-me-to-a-secret-token
 PORT=9001
+DATA_DIR=/var/lib/i-am-here
 MAX_HOURS=24
 EOF
+        mkdir -p /var/lib/i-am-here
+        chmod 700 /var/lib/i-am-here
         chmod 600 /etc/i-am-here/env
     fi
 
