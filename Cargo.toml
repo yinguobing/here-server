@@ -25,6 +25,7 @@ section = "net"
 priority = "optional"
 assets = [
     ["target/release/here-server", "usr/bin/here-server", "755"],
+    ["target/release/here", "usr/bin/here", "755"],
     ["debian/here-server.service", "lib/systemd/system/here-server.service", "644"],
 ]
 maintainer-scripts = "debian/"

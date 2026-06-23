@@ -64,9 +64,10 @@ jobs:
         run: |
           mkdir -p dist
           cp target/${{ matrix.target }}/release/here-server dist/here-server
+          cp target/${{ matrix.target }}/release/here dist/here
           cp README.md dist/
           cd dist
-          tar czf here-server-${{ github.ref_name }}-${{ matrix.target }}.tar.gz here-server README.md
+          tar czf here-server-${{ github.ref_name }}-${{ matrix.target }}.tar.gz here-server here README.md
           echo "ASSET=here-server-${{ github.ref_name }}-${{ matrix.target }}.tar.gz" >> $GITHUB_ENV
 
       - name: Package (Windows)
@@ -75,9 +76,10 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist
           Copy-Item target/${{ matrix.target }}/release/here-server.exe dist/here-server.exe
+          Copy-Item target/${{ matrix.target }}/release/here.exe dist/here.exe
           Copy-Item README.md dist/
           cd dist
-          Compress-Archive -Path here-server.exe,README.md -DestinationPath here-server-${{ github.ref_name }}-${{ matrix.target }}.zip
+          Compress-Archive -Path here-server.exe,here.exe,README.md -DestinationPath here-server-${{ github.ref_name }}-${{ matrix.target }}.zip
           echo "ASSET=here-server-${{ github.ref_name }}-${{ matrix.target }}.zip" >> $env:GITHUB_ENV
 
       - name: Calculate checksum (Unix)
