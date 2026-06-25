@@ -1,19 +1,19 @@
-# 我在这里 (I Am Here)
+# Here Server
 
-鸿蒙 App「我在这里」的后端服务。接收设备上报的 GPS 定位数据，基于 SurrealDB 存储，支持多用户独立 Token 和数据隔离。
+鸿蒙App「我在这里」的后端服务。接收设备上报的GPS定位数据，基于SurrealDB存储，支持多用户独立Token和数据隔离。
 
-> App 下载与使用说明：[yinguobing.com/tools/footprint-ohos](https://yinguobing.com/tools/footprint-ohos/)
+> App邀请测试中。
 
 ## 两个二进制
 
 | 二进制 | 用途 |
 |---|---|
-| `here-server` | HTTP 服务，常驻后台运行。接收和查询定位数据 |
-| `here` | 管理 CLI，跑完即退。创建用户、轮换 Token 等 |
+| `here-server` | HTTP服务，常驻后台运行。接收和查询定位数据 |
+| `here` | 管理CLI，跑完即退。创建用户、轮换Token等 |
 
 ## 用户管理
 
-首次使用需创建用户（获得独立 Token）：
+首次使用需创建用户（获得独立Token）：
 
 ```bash
 # 创建用户
