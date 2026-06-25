@@ -135,7 +135,6 @@ curl -H "Authorization: Bearer <token>" \
 | `PORT` | `9001` | 监听端口 |
 | `DATA_DIR` | `/var/lib/here-server` | 数据库持久化目录 |
 | `MAX_HOURS` | `24` | 定位记录保留时长 |
-| `LOCATION_TOKEN` | — | 向后兼容：设置后自动创建 admin 用户 |
 
 ## 数据存储
 

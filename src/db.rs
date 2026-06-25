@@ -133,28 +133,21 @@ pub async fn create_user(
     db: &Surreal<surrealdb::engine::local::Db>,
     name: &str,
 ) -> Result<UserInfo, surrealdb::Error> {
-    create_user_with_token(db, name, &uuid_v4()).await
-}
-
-pub async fn create_user_with_token(
-    db: &Surreal<surrealdb::engine::local::Db>,
-    name: &str,
-    token: &str,
-) -> Result<UserInfo, surrealdb::Error> {
+    let token = uuid_v4();
     let mut result = db
         .query(
             "CREATE users CONTENT { name: $name, api_token: $api_tok } RETURN id, name, api_token",
         )
         .bind(("name", name.to_string()))
-        .bind(("api_tok", token.to_string()))
+        .bind(("api_tok", token.clone()))
         .await?;
     let mut users: Vec<UserInfo> = result.take(0)?;
     let mut user = users.pop().unwrap_or_else(|| UserInfo {
         id: serde_json::Value::String("users:unknown".into()),
         name: name.into(),
-        api_token: token.to_string(),
+        api_token: token.clone(),
     });
-    user.api_token = token.to_string();
+    user.api_token = token;
     Ok(user)
 }
 

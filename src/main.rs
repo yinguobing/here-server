@@ -12,9 +12,7 @@ use chrono::{TimeDelta, Utc};
 use serde::Deserialize;
 use tracing::{error, info};
 
-use db::{
-    create_user_with_token, find_user_by_token, insert_location, prune_old_locations, LocationInput,
-};
+use db::{find_user_by_token, insert_location, prune_old_locations, LocationInput};
 use here_server::db;
 
 // ---------------------------------------------------------------------------
@@ -191,24 +189,6 @@ async fn main() {
         eprintln!("Failed to initialize database at {db_path}: {e}");
         std::process::exit(1);
     });
-
-    // Auto-create admin user from legacy LOCATION_TOKEN if set
-    if let Ok(token) = env::var("LOCATION_TOKEN") {
-        if token != "change-me-to-a-secret-token" {
-            // Check if this token already exists
-            match find_user_by_token(&db, &token).await {
-                Ok(None) => {
-                    if let Err(e) = create_user_with_token(&db, "admin", &token).await {
-                        error!("Failed to auto-create admin user: {e}");
-                    } else {
-                        info!("Auto-created admin user from LOCATION_TOKEN");
-                    }
-                }
-                Err(e) => error!("Failed to check for existing admin: {e}"),
-                _ => {} // token already exists
-            }
-        }
-    }
 
     let state = Arc::new(AppState { db, max_hours });
 
