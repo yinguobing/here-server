@@ -158,8 +158,7 @@ pub async fn rotate_user_token(
     id: &str,
 ) -> Result<String, surrealdb::Error> {
     let token = uuid_v4();
-    db.query("UPDATE $id SET api_token = $api_tok")
-        .bind(("id", id.to_string()))
+    db.query(format!("UPDATE {id} SET api_token = $api_tok"))
         .bind(("api_tok", token.clone()))
         .await?;
     Ok(token)

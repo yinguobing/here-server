@@ -130,7 +130,10 @@ fn cmd_delete_user(base: &str, token: &str, id: &str) {
 
 fn cmd_rotate_token(base: &str, token: &str, id: &str) {
     match post_json(&format!("{base}/users/{id}/rotate"), token, None) {
-        Ok(body) => println!("New token for {id}: {}", body["token"]),
+        Ok(body) => println!(
+            "New token for {id}: {}",
+            body["token"].as_str().unwrap_or("-")
+        ),
         Err(e) => eprintln!("Error: {e}"),
     }
 }
