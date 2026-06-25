@@ -77,8 +77,9 @@
 | 状态码 | 含义 |
 |---|---|
 | 200 | 上报成功 |
-| 400 | 请求格式错误（缺少必填字段 / Content-Type 不对） |
+| 400 | Content-Type 缺失或不正确 |
 | 401 | Token 无效 |
+| 422 | JSON 格式错误或缺少必填字段 |
 | 404 | 路径不存在 |
 
 成功响应 Body：
@@ -87,7 +88,7 @@
 {"ok": true, "count": 42}
 ```
 
-> `count` 为当前存储的定位记录总数。
+> `count` 为当前用户的定位记录总数（每人独立计数）。
 
 ### GET /location
 
@@ -147,7 +148,7 @@ SurrealDB 嵌入式数据库，通过 `DATA_DIR` 指定持久化目录（默认 
 从 [Releases](https://github.com/yinguobing/here-server/releases) 下载 deb 包：
 
 ```bash
-sudo dpkg -i here-server_0.1.0-1_amd64.deb
+sudo dpkg -i here-server_*.deb
 ```
 
 安装后自动创建 `/etc/here-server/env` 并启动服务。**启动后创建用户：**
