@@ -73,18 +73,12 @@ pub struct User {
     pub id: serde_json::Value,
     pub name: String,
     pub api_token: String,
-    #[serde(default = "default_max_records")]
-    pub max_records: i64,
 }
 
 impl User {
     pub fn id_str(&self) -> String {
         id_value_to_string(&self.id)
     }
-}
-
-fn default_max_records() -> i64 {
-    10000
 }
 
 fn id_value_to_string(v: &serde_json::Value) -> String {
@@ -105,25 +99,12 @@ fn id_value_to_string(v: &serde_json::Value) -> String {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, SurrealValue)]
-pub struct UserInfo {
-    pub id: serde_json::Value,
-    pub name: String,
-    pub api_token: String,
-}
-
-impl UserInfo {
-    pub fn id_str(&self) -> String {
-        id_value_to_string(&self.id)
-    }
-}
-
 pub async fn find_user_by_token(
     db: &Surreal<surrealdb::engine::local::Db>,
     token: &str,
 ) -> Result<Option<User>, surrealdb::Error> {
     let mut result = db
-        .query("SELECT * FROM users WHERE api_token = $api_tok")
+        .query("SELECT id, name, api_token FROM users WHERE api_token = $api_tok")
         .bind(("api_tok", token.to_string()))
         .await?;
     let users: Vec<User> = result.take(0)?;
@@ -133,7 +114,7 @@ pub async fn find_user_by_token(
 pub async fn create_user(
     db: &Surreal<surrealdb::engine::local::Db>,
     name: &str,
-) -> Result<UserInfo, surrealdb::Error> {
+) -> Result<User, surrealdb::Error> {
     let token = uuid_v4();
     let mut result = db
         .query(
@@ -142,8 +123,8 @@ pub async fn create_user(
         .bind(("name", name.to_string()))
         .bind(("api_tok", token.clone()))
         .await?;
-    let mut users: Vec<UserInfo> = result.take(0)?;
-    let mut user = users.pop().unwrap_or_else(|| UserInfo {
+    let mut users: Vec<User> = result.take(0)?;
+    let mut user = users.pop().unwrap_or_else(|| User {
         id: serde_json::Value::String("users:unknown".into()),
         name: name.into(),
         api_token: token.clone(),
@@ -154,11 +135,11 @@ pub async fn create_user(
 
 pub async fn list_users(
     db: &Surreal<surrealdb::engine::local::Db>,
-) -> Result<Vec<UserInfo>, surrealdb::Error> {
+) -> Result<Vec<User>, surrealdb::Error> {
     let mut result = db
         .query("SELECT id, name, api_token FROM users ORDER BY id")
         .await?;
-    let users: Vec<UserInfo> = result.take(0)?;
+    let users: Vec<User> = result.take(0)?;
     Ok(users)
 }
 
