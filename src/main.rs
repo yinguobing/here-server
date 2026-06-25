@@ -10,9 +10,10 @@ use axum::{
 };
 use chrono::{TimeDelta, Utc};
 use serde::Deserialize;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use db::{find_user_by_token, insert_location, prune_old_locations, LocationInput};
+use here_server::admin;
 use here_server::db;
 
 // ---------------------------------------------------------------------------
@@ -20,7 +21,7 @@ use here_server::db;
 // ---------------------------------------------------------------------------
 
 struct AppState {
-    db: surrealdb::Surreal<surrealdb::engine::local::Db>,
+    db: Arc<surrealdb::Surreal<surrealdb::engine::local::Db>>,
     max_hours: i64,
 }
 
@@ -168,6 +169,19 @@ async fn health() -> &'static str {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+fn uuid_v4() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    format!("{:x}-{:x}", ts >> 32, ts & 0xFFFF_FFFF)
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -185,13 +199,25 @@ async fn main() {
         .and_then(|v| v.parse().ok())
         .unwrap_or(24);
 
-    let db = db::init(&db_path).await.unwrap_or_else(|e| {
+    let db = Arc::new(db::init(&db_path).await.unwrap_or_else(|e| {
         eprintln!("Failed to initialize database at {db_path}: {e}");
         std::process::exit(1);
+    }));
+
+    // --- Admin token ---
+    let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| {
+        let token = uuid_v4();
+        warn!("ADMIN_TOKEN not set — auto-generated. Set ADMIN_TOKEN env var to fix.");
+        info!("Auto-generated ADMIN_TOKEN: {token}");
+        token
     });
 
-    let state = Arc::new(AppState { db, max_hours });
+    let state = Arc::new(AppState {
+        db: db.clone(),
+        max_hours,
+    });
 
+    // --- Public API (0.0.0.0) ---
     let app = Router::new()
         .route("/location", get(get_locations).post(post_location))
         .route("/health", get(health))
@@ -209,6 +235,27 @@ async fn main() {
             std::process::exit(1);
         });
 
-    info!("Location receiver running on port {port}");
-    axum::serve(listener, app).await.unwrap();
+    info!("Public API listening on 0.0.0.0:{port}");
+
+    // --- Admin API (127.0.0.1 only) ---
+    let admin_port = port + 1;
+    let admin_router = admin::router(Arc::new(admin::AdminState {
+        db: db.clone(),
+        admin_token: admin_token.clone(),
+    }));
+
+    let admin_listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{admin_port}"))
+        .await
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to bind admin port {admin_port}: {e}");
+            std::process::exit(1);
+        });
+
+    info!("Admin API listening on 127.0.0.1:{admin_port}");
+
+    // Run both servers concurrently
+    tokio::select! {
+        r = axum::serve(listener, app) => { if let Err(e) = r { error!("Public server error: {e}"); } }
+        r = axum::serve(admin_listener, admin_router) => { if let Err(e) = r { error!("Admin server error: {e}"); } }
+    }
 }
