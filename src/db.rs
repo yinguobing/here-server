@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use surrealdb::engine::local::SurrealKv;
+use surrealdb::types::SurrealValue;
 use surrealdb::Surreal;
 
 // ---------------------------------------------------------------------------
@@ -67,7 +68,7 @@ pub async fn init(
 // User types & queries
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, SurrealValue)]
 pub struct User {
     pub id: serde_json::Value,
     pub name: String,
@@ -104,7 +105,7 @@ fn id_value_to_string(v: &serde_json::Value) -> String {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, SurrealValue)]
 pub struct UserInfo {
     pub id: serde_json::Value,
     pub name: String,
@@ -187,7 +188,7 @@ pub async fn rotate_user_token(
 // Location types & queries
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, SurrealValue)]
 pub struct LocationRecord {
     pub id: serde_json::Value,
     pub user_id: String,
@@ -264,7 +265,7 @@ pub async fn prune_old_locations(
     Ok(())
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, SurrealValue)]
 struct CountResult {
     count: i64,
 }
