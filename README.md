@@ -8,27 +8,31 @@
 
 | 二进制 | 用途 |
 |---|---|
-| `here-server` | HTTP服务，常驻后台运行。接收和查询定位数据 |
-| `here` | 管理CLI，跑完即退。创建用户、轮换Token等 |
+| `here-server` | HTTP 服务，常驻后台运行。接收和查询定位数据，管理 API（127.0.0.1） |
+| `here` | 管理 CLI，通过 HTTP 调 `here-server` 的管理接口。不直接操作数据库 |
 
 ## 用户管理
 
-首次使用需创建用户（获得独立Token）：
+`here` CLI 通过网络调用 `here-server` 的管理 API，服务运行中也能操作。需设置 `ADMIN_TOKEN` 环境变量。
 
 ```bash
+export ADMIN_TOKEN=your-admin-token
+
 # 创建用户
-./here add-user "你的名字"
+here add-user "你的名字"
 # → 输出 ID、Name、Token
 
 # 查看所有用户
-./here list-users
+here list-users
 
 # 轮换 Token
-./here rotate-token <用户ID>
+here rotate-token <用户ID>
 
 # 删除用户（含其所有数据）
-./here delete-user <用户ID>
+here delete-user <用户ID>
 ```
+
+> 首次启动时若未设置 `ADMIN_TOKEN`，服务会自动生成并打印到日志。`here` 和 `here-server` 不再抢占数据库锁，可以同时运行。
 
 ## API
 
@@ -132,9 +136,10 @@ curl -H "Authorization: Bearer <token>" \
 
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
-| `PORT` | `9001` | 监听端口 |
+| `PORT` | `9001` | 公开 API 端口（管理端口 = PORT+1） |
 | `DATA_DIR` | `/var/lib/here-server` | 数据库持久化目录 |
 | `MAX_HOURS` | `24` | 定位记录保留时长 |
+| `ADMIN_TOKEN` | 自动生成 | 管理 API 鉴权 Token，启动时未设置则随机生成 |
 
 ## 数据存储
 
@@ -150,10 +155,14 @@ SurrealDB 嵌入式数据库，通过 `DATA_DIR` 指定持久化目录（默认 
 sudo dpkg -i here-server_*.deb
 ```
 
-安装后自动创建 `/etc/here-server/env` 并启动服务。**启动后创建用户：**
+安装后自动创建 `/etc/here-server/env` 并启动服务。**获取 ADMIN_TOKEN 并创建用户：**
 
 ```bash
-# 获得用户 Token
+# 查看自动生成的 ADMIN_TOKEN
+sudo journalctl -u here-server --no-pager | grep "ADMIN_TOKEN"
+
+# 设置环境变量并创建用户
+export ADMIN_TOKEN=<上一步获取的值>
 here add-user "你的名字"
 
 # 将输出的 Token 填入 App 设置页
@@ -165,6 +174,8 @@ here add-user "你的名字"
 systemctl status here-server   # 查看状态
 systemctl restart here-server  # 重启（修改配置后）
 journalctl -u here-server -f   # 查看日志
+
+# 以下命令需 ADMIN_TOKEN 环境变量
 here list-users            # 查看所有用户
 here add-user "name"       # 新增用户
 ```
@@ -175,12 +186,13 @@ here add-user "name"       # 新增用户
 # 1. 编译（输出两个二进制：here-server、here）
 cargo build --release
 
-# 2. 启动服务
+# 2. 启动服务（ADMIN_TOKEN 未设置时自动生成，注意日志输出）
 export DATA_DIR=/var/lib/here-server
 export PORT=9001
 ./target/release/here-server &
 
 # 3. 创建用户
+export ADMIN_TOKEN=<日志中输出的 token>
 ./target/release/here add-user "你的名字"
 ```
 
