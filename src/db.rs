@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use surrealdb::engine::local::SurrealKv;
+use surrealdb::types::SurrealValue;
 use surrealdb::Surreal;
 
 // ---------------------------------------------------------------------------
@@ -67,29 +68,53 @@ pub async fn init(
 // User types & queries
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, SurrealValue)]
 pub struct User {
-    pub id: Option<surrealdb::sql::Thing>,
+    pub id: serde_json::Value,
     pub name: String,
     pub api_token: String,
     #[serde(default = "default_max_records")]
     pub max_records: i64,
 }
 
+impl User {
+    pub fn id_str(&self) -> String {
+        id_value_to_string(&self.id)
+    }
+}
+
 fn default_max_records() -> i64 {
     10000
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+fn id_value_to_string(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Object(obj) => {
+            let tb = obj.get("tb").and_then(|v| v.as_str()).unwrap_or("users");
+            let rid = obj
+                .get("id")
+                .and_then(|v| {
+                    v.as_str()
+                        .or_else(|| v.as_object()?.get("String")?.as_str())
+                })
+                .unwrap_or("unknown");
+            format!("{tb}:{rid}")
+        }
+        _ => "users:unknown".into(),
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, SurrealValue)]
 pub struct UserInfo {
-    pub id: surrealdb::sql::Thing,
+    pub id: serde_json::Value,
     pub name: String,
     pub api_token: String,
 }
 
 impl UserInfo {
     pub fn id_str(&self) -> String {
-        self.id.to_raw()
+        id_value_to_string(&self.id)
     }
 }
 
@@ -126,7 +151,7 @@ pub async fn create_user_with_token(
         .await?;
     let mut users: Vec<UserInfo> = result.take(0)?;
     let mut user = users.pop().unwrap_or_else(|| UserInfo {
-        id: surrealdb::sql::Thing::from(("users", "unknown")),
+        id: serde_json::Value::String("users:unknown".into()),
         name: name.into(),
         api_token: token.to_string(),
     });
@@ -170,9 +195,9 @@ pub async fn rotate_user_token(
 // Location types & queries
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, SurrealValue)]
 pub struct LocationRecord {
-    pub id: Option<surrealdb::sql::Thing>,
+    pub id: serde_json::Value,
     pub user_id: String,
     pub lat: f64,
     pub lon: f64,
@@ -247,7 +272,7 @@ pub async fn prune_old_locations(
     Ok(())
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, SurrealValue)]
 struct CountResult {
     count: i64,
 }

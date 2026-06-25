@@ -101,10 +101,7 @@ async fn post_location(
         })?
         .ok_or(AppError::Unauthorized)?;
 
-    let user_id = user
-        .id
-        .map(|t| t.to_raw())
-        .unwrap_or_else(|| "users:unknown".into());
+    let user_id = user.id_str();
 
     info!(
         "POST /location user={} lat={:.6} lon={:.6} ts={}",
@@ -156,10 +153,7 @@ async fn get_locations(
         })?
         .ok_or(AppError::Unauthorized)?;
 
-    let user_id = user
-        .id
-        .map(|t| t.to_raw())
-        .unwrap_or_else(|| "users:unknown".into());
+    let user_id = user.id_str();
 
     let records = db::get_locations(&state.db, &user_id, q.limit)
         .await
