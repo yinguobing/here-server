@@ -2,18 +2,34 @@
 
 鸿蒙App「我在这里」的后端服务。接收设备上报的GPS定位数据，基于SurrealDB存储，支持多用户独立Token和数据隔离。
 
+所有功能统一在单一端口，通过不同 auth 机制区分权限。
+
 > App邀请测试中。
 
 ## 两个二进制
 
 | 二进制 | 用途 |
 |---|---|
-| `here-server` | HTTP 服务，常驻后台运行。接收和查询定位数据，管理 API（127.0.0.1） |
-| `here` | 管理 CLI，通过 HTTP 调 `here-server` 的管理接口。不直接操作数据库 |
+| `here-server` | HTTP 服务，常驻后台运行。接收和查询定位数据 + 用户管理 + MCP 端点 |
+| `here` | 管理 CLI，通过 HTTP 调 `here-server`。不直接操作数据库 |
+
+## 架构
+
+```
+0.0.0.0:9001
+├── GET  /health              (无鉴权)
+├── POST /location            (Bearer token)
+├── GET  /location            (Bearer token)
+├── POST /users               (X-Admin-Token)
+├── GET  /users               (X-Admin-Token)
+├── DELETE /users/{id}        (X-Admin-Token)
+├── POST /users/{id}/rotate   (X-Admin-Token)
+└── POST /mcp                 (MCP streamable HTTP — 工具内鉴权)
+```
 
 ## 用户管理
 
-`here` CLI 通过网络调用 `here-server` 的管理 API，服务运行中也能操作。需设置 `ADMIN_TOKEN` 环境变量。
+`here` CLI 通过网络调用 `here-server`，服务运行中也能操作。需设置 `ADMIN_TOKEN` 环境变量。
 
 ```bash
 export ADMIN_TOKEN=your-admin-token
@@ -33,6 +49,16 @@ here delete-user <用户ID>
 ```
 
 > 首次启动时若未设置 `ADMIN_TOKEN`，服务会自动生成并打印到日志。`here` 和 `here-server` 不再抢占数据库锁，可以同时运行。
+
+## Auth
+
+两套独立的鉴权机制，通过不同 HTTP Header 区分：
+
+| Header | 用途 | 校验方式 |
+|---|---|---|
+| `Authorization: Bearer <token>` | 用户身份认证（定位数据） | 查 `users` 表 |
+| `X-Location-Token` | 兼容旧版，同上 | 同上 |
+| `X-Admin-Token` | 管理操作授权 | 环境变量比对 |
 
 ## API
 
@@ -111,7 +137,7 @@ curl -H "Authorization: Bearer <token>" \
   "http://localhost:9001/location?limit=10"
 ```
 
-响应：按时间升序的最近 N 条记录：
+响应：按时间降序的最近 N 条记录：
 
 ```json
 [
@@ -132,11 +158,50 @@ curl -H "Authorization: Bearer <token>" \
 
 健康检查，返回 `ok`。
 
+### Admin 端点
+
+所有 `/users` 路由需要 `X-Admin-Token` header。
+
+| 方法 | 路由 | 说明 |
+|---|---|---|
+| POST | `/users` | 创建用户，body: `{"name": "..."}` |
+| GET | `/users` | 列出所有用户 |
+| DELETE | `/users/{id}` | 删除用户及其数据 |
+| POST | `/users/{id}/rotate` | 轮换用户 API Token |
+
+## MCP
+
+`/mcp` 端点提供 [Model Context Protocol](https://modelcontextprotocol.io/) 支持，可被 Claude Desktop / Claude Code 连接。
+
+**工具列表：**
+
+| 工具 | 鉴权 | 说明 |
+|---|---|---|
+| `create_user` | admin_token 参数 | 创建新用户 |
+| `list_users` | admin_token 参数 | 列出所有用户 |
+| `delete_user` | admin_token 参数 | 删除用户及数据 |
+| `rotate_token` | admin_token 参数 | 轮换用户 Token |
+| `get_locations` | 用户 API token | 查询位置记录 |
+
+在 Claude 中配置：
+
+```json
+{
+  "mcpServers": {
+    "here-server": {
+      "url": "http://127.0.0.1:9001/mcp"
+    }
+  }
+}
+```
+
+> 远程访问需通过 Nginx 反向代理。
+
 ## 配置
 
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
-| `PORT` | `9001` | 公开 API 端口（管理端口 = PORT+1） |
+| `PORT` | `9001` | HTTP 端口 |
 | `DATA_DIR` | `/var/lib/here-server` | 数据库持久化目录 |
 | `MAX_HOURS` | `24` | 定位记录保留时长 |
 | `ADMIN_TOKEN` | 自动生成 | 管理 API 鉴权 Token，启动时未设置则随机生成 |
@@ -218,3 +283,5 @@ server {
     }
 }
 ```
+
+> `/mcp` 端点共用同一端口，无需额外配置。

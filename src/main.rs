@@ -5,7 +5,7 @@ use axum::{
     extract::{Query, State},
     http::HeaderMap,
     response::Json,
-    routing::get,
+    routing::{delete, get, post},
     Router,
 };
 use chrono::{TimeDelta, Utc};
@@ -13,18 +13,9 @@ use serde::Deserialize;
 use tracing::{error, info, warn};
 
 use db::{find_user_by_token, insert_location, prune_old_locations, LocationInput};
-use here_server::admin;
+use here_server::admin::{self, AppState};
 use here_server::db;
 use here_server::error::AppError;
-
-// ---------------------------------------------------------------------------
-// App state
-// ---------------------------------------------------------------------------
-
-struct AppState {
-    db: Arc<surrealdb::Surreal<surrealdb::engine::local::Db>>,
-    max_hours: i64,
-}
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -178,16 +169,22 @@ async fn main() {
         token
     });
 
+    // --- Build the unified router ---
     let state = Arc::new(AppState {
         db: db.clone(),
         max_hours,
+        admin_token: admin_token.clone(),
     });
+    let mcp_service = here_server::mcp::create_service(db.clone(), admin_token.clone());
 
-    // --- Public API (0.0.0.0) ---
     let app = Router::new()
         .route("/location", get(get_locations).post(post_location))
         .route("/health", get(health))
-        .with_state(state);
+        .route("/users", post(admin::add_user).get(admin::list_users))
+        .route("/users/{id}", delete(admin::delete_user))
+        .route("/users/{id}/rotate", post(admin::rotate_token))
+        .with_state(state.clone())
+        .nest_service("/mcp", mcp_service);
 
     let port: u16 = env::var("PORT")
         .ok()
@@ -201,31 +198,9 @@ async fn main() {
             std::process::exit(1);
         });
 
-    info!("Public API listening on 0.0.0.0:{port}");
+    info!("Server listening on 0.0.0.0:{port}");
 
-    // --- Admin API (127.0.0.1 only) ---
-    let admin_port = port + 1;
-    let admin_router = admin::router(Arc::new(admin::AdminState {
-        db: db.clone(),
-        admin_token: admin_token.clone(),
-    }));
-
-    let admin_listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{admin_port}"))
-        .await
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to bind admin port {admin_port}: {e}");
-            std::process::exit(1);
-        });
-
-    // MCP streamable-HTTP endpoint on the admin port
-    let mcp_service = here_server::mcp::create_service(db.clone(), admin_token.clone());
-    let admin_router = admin_router.nest_service("/mcp", mcp_service);
-
-    info!("Admin API + MCP listening on 127.0.0.1:{admin_port}");
-
-    // Run both servers concurrently
-    tokio::select! {
-        r = axum::serve(listener, app) => { if let Err(e) = r { error!("Public server error: {e}"); } }
-        r = axum::serve(admin_listener, admin_router) => { if let Err(e) = r { error!("Admin server error: {e}"); } }
-    }
+    axum::serve(listener, app).await.unwrap_or_else(|e| {
+        error!("Server error: {e}");
+    });
 }

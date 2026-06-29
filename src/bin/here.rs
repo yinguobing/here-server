@@ -11,12 +11,11 @@ fn main() {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(9001);
-    let admin_port = port + 1;
     let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| {
         eprintln!("Error: ADMIN_TOKEN not set");
         std::process::exit(1);
     });
-    let base = format!("http://127.0.0.1:{admin_port}");
+    let base = format!("http://127.0.0.1:{port}");
 
     match args[1].as_str() {
         "add-user" => {
@@ -146,5 +145,5 @@ fn usage(prog: &str) {
     eprintln!("  {prog} rotate-token <id>       Generate a new token for a user");
     eprintln!();
     eprintln!("  ADMIN_TOKEN env var  → required");
-    eprintln!("  PORT env var         → admin port = PORT+1 (default 9001 → 9002)");
+    eprintln!("  PORT env var         → default 9001");
 }
