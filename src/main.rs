@@ -217,7 +217,11 @@ async fn main() {
             std::process::exit(1);
         });
 
-    info!("Admin API listening on 127.0.0.1:{admin_port}");
+    // MCP streamable-HTTP endpoint on the admin port
+    let mcp_service = here_server::mcp::create_service(db.clone(), admin_token.clone());
+    let admin_router = admin_router.nest_service("/mcp", mcp_service);
+
+    info!("Admin API + MCP listening on 127.0.0.1:{admin_port}");
 
     // Run both servers concurrently
     tokio::select! {

@@ -16,6 +16,12 @@ chrono = { version = "0.4", features = ["serde"] }
 surrealdb = { version = "3.1.5", features = ["kv-surrealkv"] }
 ureq = { version = "3", features = ["json"] }
 uuid = { version = "1", features = ["v4"] }
+rmcp = { version = "1.8.0", default-features = false, features = [
+    "server",
+    "macros",
+    "transport-streamable-http-server",
+] }
+schemars = "1"
 
 [package.metadata.deb]
 maintainer = "yinguobing"
