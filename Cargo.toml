@@ -22,6 +22,7 @@ rmcp = { version = "1.8.0", default-features = false, features = [
     "transport-streamable-http-server",
 ] }
 schemars = "1"
+http = "1.4.2"
 
 [package.metadata.deb]
 maintainer = "yinguobing"

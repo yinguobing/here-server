@@ -1,10 +1,10 @@
 //! MCP (Model Context Protocol) endpoint — streamable HTTP on the admin port.
 //!
 //! Exposes 5 tools via the admin port's `/mcp` path:
-//!   create_user    — Admin: create a user
-//!   list_users     — Admin: list all users
-//!   delete_user    — Admin: delete a user and their data
-//!   rotate_token   — Admin: rotate a user's API token
+//!   create_user    — Admin: create a user  (auth via X-Admin-Token header)
+//!   list_users     — Admin: list all users  (auth via X-Admin-Token header)
+//!   delete_user    — Admin: delete a user   (auth via X-Admin-Token header)
+//!   rotate_token   — Admin: rotate token    (auth via X-Admin-Token header)
 //!   get_locations  — Public: query location records for a given user token
 
 use std::sync::Arc;
@@ -12,11 +12,13 @@ use std::sync::Arc;
 use rmcp::{
     handler::server::wrapper::Parameters,
     model::{CallToolResult, Content, ErrorCode},
-    schemars, tool, tool_router,
+    schemars,
+    service::RequestContext,
+    tool, tool_router,
     transport::streamable_http_server::{
         session::local::LocalSessionManager, StreamableHttpServerConfig, StreamableHttpService,
     },
-    ErrorData,
+    ErrorData, RoleServer,
 };
 use serde::Deserialize;
 
@@ -42,35 +44,57 @@ impl HereMcp {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+fn internal_error(msg: impl Into<String>) -> ErrorData {
+    ErrorData::new(ErrorCode::INTERNAL_ERROR, msg.into(), None)
+}
+
+fn invalid_params(msg: impl Into<String>) -> ErrorData {
+    ErrorData::new(ErrorCode::INVALID_PARAMS, msg.into(), None)
+}
+
+fn json_result(value: impl serde::Serialize) -> Result<CallToolResult, ErrorData> {
+    let text = serde_json::to_string_pretty(&value).map_err(|e| internal_error(e.to_string()))?;
+    Ok(CallToolResult::success(vec![Content::text(text)]))
+}
+
+/// Extract the `X-Admin-Token` header from the MCP request's HTTP context.
+fn extract_admin_token(ctx: &RequestContext<RoleServer>) -> Option<String> {
+    let parts = ctx.extensions.get::<http::request::Parts>()?;
+    parts
+        .headers
+        .get("X-Admin-Token")?
+        .to_str()
+        .ok()
+        .map(|s| s.to_string())
+}
+
+// ---------------------------------------------------------------------------
 // Request types
 // ---------------------------------------------------------------------------
 
+/// Admin tools read `admin_token` from the `X-Admin-Token` HTTP header.
+/// Only the user-facing `get_locations` tool requires a token parameter.
+
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 pub struct CreateUserRequest {
-    /// Admin token for authentication
-    pub admin_token: String,
     /// Display name for the new user
     pub name: String,
 }
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
-pub struct ListUsersRequest {
-    /// Admin token for authentication
-    pub admin_token: String,
-}
+pub struct ListUsersRequest {}
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 pub struct DeleteUserRequest {
-    /// Admin token for authentication
-    pub admin_token: String,
     /// User ID (e.g. "users:xxxxx")
     pub id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 pub struct RotateTokenRequest {
-    /// Admin token for authentication
-    pub admin_token: String,
     /// User ID (e.g. "users:xxxxx")
     pub id: String,
 }
@@ -89,37 +113,22 @@ fn default_limit() -> usize {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-fn internal_error(msg: impl Into<String>) -> ErrorData {
-    ErrorData::new(ErrorCode::INTERNAL_ERROR, msg.into(), None)
-}
-
-fn invalid_params(msg: impl Into<String>) -> ErrorData {
-    ErrorData::new(ErrorCode::INVALID_PARAMS, msg.into(), None)
-}
-
-fn json_result(value: impl serde::Serialize) -> Result<CallToolResult, ErrorData> {
-    let text = serde_json::to_string_pretty(&value).map_err(|e| internal_error(e.to_string()))?;
-    Ok(CallToolResult::success(vec![Content::text(text)]))
-}
-
-// ---------------------------------------------------------------------------
 // Tool implementations
 // ---------------------------------------------------------------------------
 
 #[tool_router(server_handler)]
 impl HereMcp {
-    /// Create a new user. Returns the user's ID, name, and API token.
+    /// Create a new user. Authenticated via X-Admin-Token header.
     #[tool(
-        description = "Create a new user. Requires admin_token. Returns user ID, name, and API token."
+        description = "Create a new user. Authenticated via X-Admin-Token header. Returns user ID, name, and API token."
     )]
     async fn create_user(
         &self,
+        ctx: RequestContext<RoleServer>,
         Parameters(req): Parameters<CreateUserRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        if req.admin_token != self.admin_token {
+        let token = extract_admin_token(&ctx).unwrap_or_default();
+        if token != self.admin_token {
             return Err(invalid_params("Invalid admin_token"));
         }
 
@@ -134,13 +143,15 @@ impl HereMcp {
         }))
     }
 
-    /// List all registered users.
-    #[tool(description = "List all registered users. Requires admin_token.")]
+    /// List all registered users. Authenticated via X-Admin-Token header.
+    #[tool(description = "List all registered users. Authenticated via X-Admin-Token header.")]
     async fn list_users(
         &self,
-        Parameters(req): Parameters<ListUsersRequest>,
+        ctx: RequestContext<RoleServer>,
+        Parameters(_req): Parameters<ListUsersRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        if req.admin_token != self.admin_token {
+        let token = extract_admin_token(&ctx).unwrap_or_default();
+        if token != self.admin_token {
             return Err(invalid_params("Invalid admin_token"));
         }
 
@@ -162,15 +173,17 @@ impl HereMcp {
         json_result(json)
     }
 
-    /// Delete a user and all their location data.
+    /// Delete a user and all their location data. Authenticated via X-Admin-Token header.
     #[tool(
-        description = "Delete a user and all their location data. Requires admin_token and user ID."
+        description = "Delete a user and all their location data. Authenticated via X-Admin-Token header."
     )]
     async fn delete_user(
         &self,
+        ctx: RequestContext<RoleServer>,
         Parameters(req): Parameters<DeleteUserRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        if req.admin_token != self.admin_token {
+        let token = extract_admin_token(&ctx).unwrap_or_default();
+        if token != self.admin_token {
             return Err(invalid_params("Invalid admin_token"));
         }
 
@@ -181,15 +194,17 @@ impl HereMcp {
         json_result(serde_json::json!({"ok": true, "deleted": req.id}))
     }
 
-    /// Rotate (regenerate) a user's API token.
+    /// Rotate a user's API token. Authenticated via X-Admin-Token header.
     #[tool(
-        description = "Rotate (regenerate) a user's API token. Requires admin_token and user ID. Returns the new token."
+        description = "Rotate (regenerate) a user's API token. Authenticated via X-Admin-Token header. Returns the new token."
     )]
     async fn rotate_token(
         &self,
+        ctx: RequestContext<RoleServer>,
         Parameters(req): Parameters<RotateTokenRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        if req.admin_token != self.admin_token {
+        let token = extract_admin_token(&ctx).unwrap_or_default();
+        if token != self.admin_token {
             return Err(invalid_params("Invalid admin_token"));
         }
 
