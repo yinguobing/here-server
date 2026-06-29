@@ -171,31 +171,34 @@ curl -H "Authorization: Bearer <token>" \
 
 ## MCP
 
-`/mcp` 端点提供 [Model Context Protocol](https://modelcontextprotocol.io/) 支持，可被 Claude Desktop / Claude Code 连接。
+`/mcp` 端点支持 [Model Context Protocol](https://modelcontextprotocol.io/)，可被任意兼容MCP的客户端连接。
 
 **工具列表：**
 
 | 工具 | 鉴权 | 说明 |
 |---|---|---|
-| `create_user` | admin_token 参数 | 创建新用户 |
-| `list_users` | admin_token 参数 | 列出所有用户 |
-| `delete_user` | admin_token 参数 | 删除用户及数据 |
-| `rotate_token` | admin_token 参数 | 轮换用户 Token |
-| `get_locations` | 用户 API token | 查询位置记录 |
+| `create_user` | `X-Admin-Token` header | 创建新用户 |
+| `list_users` | `X-Admin-Token` header | 列出所有用户 |
+| `delete_user` | `X-Admin-Token` header | 删除用户及数据 |
+| `rotate_token` | `X-Admin-Token` header | 轮换用户 Token |
+| `get_locations` | 用户 API token 参数 | 查询位置记录 |
 
-在 Claude 中配置：
+MCP 客户端配置示例：
 
 ```json
 {
   "mcpServers": {
     "here-server": {
-      "url": "http://127.0.0.1:9001/mcp"
+      "url": "https://your-domain.com/mcp",
+      "headers": {
+        "X-Admin-Token": "your-admin-token"
+      }
     }
   }
 }
 ```
 
-> 远程访问需通过 Nginx 反向代理。
+> 本地测试用 `http://127.0.0.1:9001/mcp`，远程访问需通过 Nginx 反向代理并开启 HTTPS。
 
 ## 配置
 
