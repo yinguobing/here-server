@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, State},
-    http::{HeaderMap, StatusCode},
-    response::{IntoResponse, Json},
+    http::HeaderMap,
+    response::Json,
     routing::{delete, post},
     Router,
 };
@@ -14,6 +14,7 @@ use serde::Deserialize;
 use tracing::{error, info};
 
 use crate::db::{self, User};
+use crate::error::AppError;
 use surrealdb::Surreal;
 
 // ---------------------------------------------------------------------------
@@ -103,28 +104,6 @@ async fn rotate_token(
         .map_err(|e| AppError::Internal(e.to_string()))?;
     info!("Admin: rotated token for user {id}");
     Ok(Json(serde_json::json!({"token": token})))
-}
-
-// ---------------------------------------------------------------------------
-// Errors
-// ---------------------------------------------------------------------------
-
-enum AppError {
-    Unauthorized,
-    Internal(String),
-}
-
-impl IntoResponse for AppError {
-    fn into_response(self) -> axum::response::Response {
-        match self {
-            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized"),
-            AppError::Internal(msg) => {
-                error!("{msg}");
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
-            }
-        }
-        .into_response()
-    }
 }
 
 // ---------------------------------------------------------------------------

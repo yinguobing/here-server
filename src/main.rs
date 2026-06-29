@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Query, State},
-    http::{HeaderMap, StatusCode},
-    response::{IntoResponse, Json},
+    http::HeaderMap,
+    response::Json,
     routing::get,
     Router,
 };
@@ -15,6 +15,7 @@ use tracing::{error, info, warn};
 use db::{find_user_by_token, insert_location, prune_old_locations, LocationInput};
 use here_server::admin;
 use here_server::db;
+use here_server::error::AppError;
 
 // ---------------------------------------------------------------------------
 // App state
@@ -43,28 +44,6 @@ fn default_limit() -> usize {
 struct PostResponse {
     ok: bool,
     count: usize,
-}
-
-// ---------------------------------------------------------------------------
-// Error handling
-// ---------------------------------------------------------------------------
-
-enum AppError {
-    Unauthorized,
-    Internal(String),
-}
-
-impl IntoResponse for AppError {
-    fn into_response(self) -> axum::response::Response {
-        match self {
-            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized"),
-            AppError::Internal(msg) => {
-                error!("{msg}");
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
-            }
-        }
-        .into_response()
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -169,19 +148,6 @@ async fn health() -> &'static str {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-fn uuid_v4() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    format!("{:x}-{:x}", ts >> 32, ts & 0xFFFF_FFFF)
-}
-
-// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -206,7 +172,7 @@ async fn main() {
 
     // --- Admin token ---
     let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| {
-        let token = uuid_v4();
+        let token = uuid::Uuid::new_v4().to_string();
         warn!("ADMIN_TOKEN not set — auto-generated. Set ADMIN_TOKEN env var to fix.");
         info!("Auto-generated ADMIN_TOKEN: {token}");
         token

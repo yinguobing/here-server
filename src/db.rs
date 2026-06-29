@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use surrealdb::engine::local::SurrealKv;
 use surrealdb::types::SurrealValue;
 use surrealdb::Surreal;
+use tracing::warn;
 
 // ---------------------------------------------------------------------------
 // Input type (shared between handlers and data layer)
@@ -95,7 +96,10 @@ fn id_value_to_string(v: &serde_json::Value) -> String {
                 .unwrap_or("unknown");
             format!("{tb}:{rid}")
         }
-        _ => "users:unknown".into(),
+        other => {
+            warn!("Unexpected SurrealDB record ID format: {other:?}");
+            "users:unknown".into()
+        }
     }
 }
 
@@ -115,7 +119,7 @@ pub async fn create_user(
     db: &Surreal<surrealdb::engine::local::Db>,
     name: &str,
 ) -> Result<User, surrealdb::Error> {
-    let token = uuid_v4();
+    let token = uuid::Uuid::new_v4().to_string();
     let mut result = db
         .query(
             "CREATE users CONTENT { name: $name, api_token: $api_tok } RETURN id, name, api_token",
@@ -147,9 +151,12 @@ pub async fn delete_user(
     db: &Surreal<surrealdb::engine::local::Db>,
     id: &str,
 ) -> Result<(), surrealdb::Error> {
-    db.query(format!("DELETE FROM locations WHERE user_id = '{id}'"))
+    let rid = surrealdb::types::RecordId::parse_simple(id)
+        .expect("invalid record ID format from database");
+    db.query("DELETE FROM locations WHERE user_id = $user_id")
+        .bind(("user_id", id.to_string()))
         .await?;
-    db.query(format!("DELETE FROM {id}")).await?;
+    db.query("DELETE $rid").bind(("rid", rid)).await?;
     Ok(())
 }
 
@@ -157,8 +164,11 @@ pub async fn rotate_user_token(
     db: &Surreal<surrealdb::engine::local::Db>,
     id: &str,
 ) -> Result<String, surrealdb::Error> {
-    let token = uuid_v4();
-    db.query(format!("UPDATE {id} SET api_token = $api_tok"))
+    let token = uuid::Uuid::new_v4().to_string();
+    let rid = surrealdb::types::RecordId::parse_simple(id)
+        .expect("invalid record ID format from database");
+    db.query("UPDATE $rid SET api_token = $api_tok")
+        .bind(("rid", rid))
         .bind(("api_tok", token.clone()))
         .await?;
     Ok(token)
@@ -263,14 +273,57 @@ pub async fn count_locations(
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Tests
 // ---------------------------------------------------------------------------
 
-fn uuid_v4() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    format!("{:x}-{:x}", ts >> 32, ts & 0xFFFF_FFFF)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_id_value_to_string_plain_string() {
+        let v = serde_json::json!("users:abc123");
+        assert_eq!(id_value_to_string(&v), "users:abc123");
+    }
+
+    #[test]
+    fn test_id_value_to_string_object_with_string_id() {
+        let v = serde_json::json!({
+            "tb": "users",
+            "id": "abc123"
+        });
+        assert_eq!(id_value_to_string(&v), "users:abc123");
+    }
+
+    #[test]
+    fn test_id_value_to_string_object_with_nested_string() {
+        let v = serde_json::json!({
+            "tb": "users",
+            "id": {"String": "abc123"}
+        });
+        assert_eq!(id_value_to_string(&v), "users:abc123");
+    }
+
+    #[test]
+    fn test_id_value_to_string_object_missing_tb() {
+        let v = serde_json::json!({
+            "id": "abc123"
+        });
+        assert_eq!(id_value_to_string(&v), "users:abc123");
+    }
+
+    #[test]
+    fn test_id_value_to_string_unknown_format() {
+        let v = serde_json::json!(42);
+        assert_eq!(id_value_to_string(&v), "users:unknown");
+    }
+
+    #[test]
+    fn test_id_value_to_string_location_record() {
+        let v = serde_json::json!({
+            "tb": "locations",
+            "id": "xyz789"
+        });
+        assert_eq!(id_value_to_string(&v), "locations:xyz789");
+    }
 }
