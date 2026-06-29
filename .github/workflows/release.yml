@@ -20,10 +20,6 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             archive: tar.gz
-          # Linux x86_64 (musl - static)
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            archive: tar.gz
           # macOS ARM64 (native build)
           - target: aarch64-apple-darwin
             os: macos-latest
@@ -36,12 +32,6 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: ${{ matrix.target }}
-
-      - name: Install cross-compilation tools (musl)
-        if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools
 
       - name: Cache cargo dependencies
         uses: Swatinem/rust-cache@v2
