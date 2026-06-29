@@ -28,14 +28,6 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
             archive: tar.gz
-          # macOS x86_64 (cross-compile from ARM64)
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            archive: tar.gz
-          # Windows x86_64
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            archive: zip
 
     steps:
       - uses: actions/checkout@v6
@@ -70,30 +62,10 @@ jobs:
           tar czf here-server-${{ github.ref_name }}-${{ matrix.target }}.tar.gz here-server here README.md
           echo "ASSET=here-server-${{ github.ref_name }}-${{ matrix.target }}.tar.gz" >> $GITHUB_ENV
 
-      - name: Package (Windows)
-        if: matrix.archive == 'zip'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist
-          Copy-Item target/${{ matrix.target }}/release/here-server.exe dist/here-server.exe
-          Copy-Item target/${{ matrix.target }}/release/here.exe dist/here.exe
-          Copy-Item README.md dist/
-          cd dist
-          Compress-Archive -Path here-server.exe,here.exe,README.md -DestinationPath here-server-${{ github.ref_name }}-${{ matrix.target }}.zip
-          echo "ASSET=here-server-${{ github.ref_name }}-${{ matrix.target }}.zip" >> $env:GITHUB_ENV
-
-      - name: Calculate checksum (Unix)
-        if: matrix.archive == 'tar.gz'
+      - name: Calculate checksum
         run: |
           cd dist
           sha256sum ${{ env.ASSET }} > ${{ env.ASSET }}.sha256
-
-      - name: Calculate checksum (Windows)
-        if: matrix.archive == 'zip'
-        shell: pwsh
-        run: |
-          cd dist
-          Get-FileHash -Algorithm SHA256 ${{ env.ASSET }} | Select-Object -ExpandProperty Hash | Out-File -Encoding UTF8 ${{ env.ASSET }}.sha256
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
