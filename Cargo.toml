@@ -1,6 +1,6 @@
 [package]
 name = "here-server"
-version = "0.5.0-beta"
+version = "0.5.0"
 edition = "2021"
 description = "鸿蒙 App「我在这里」的定位数据接收后端"
 license = "MIT"
